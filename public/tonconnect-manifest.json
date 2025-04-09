@@ -1,0 +1,7 @@
+{
+  "url": "http://localhost:3000",
+  "name": "TON Payment App",
+  "iconUrl": "https://ton.org/ton_symbol.svg",
+  "termsOfUseUrl": "http://localhost:3000/terms",
+  "privacyPolicyUrl": "http://localhost:3000/privacy"
+}
