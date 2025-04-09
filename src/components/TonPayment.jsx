@@ -153,6 +153,7 @@ export function TonPayment() {
 
   // Get Telegram user info if available
   const tgUser = isTelegram() ? window.Telegram.WebApp.initDataUnsafe?.user : null;
+  alert(tgUser);
 
   return (
     <div className="ton-payment-container">
