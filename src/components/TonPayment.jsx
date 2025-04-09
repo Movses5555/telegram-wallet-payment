@@ -69,7 +69,7 @@ export function TonPayment() {
 
   const validateTonAddress = (address) => {
     if (!address) return false;
-    if (!address.startsWith("EQ") && !address.startsWith("0Q")) return false;
+    if (!address.startsWith("EQ") && !address.startsWith("UQ")) return false;
     return address.length >= 48;
   };
 
