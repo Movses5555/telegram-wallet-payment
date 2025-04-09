@@ -5,7 +5,7 @@ import "../styles/TonPayment.css";
 export function TonPayment() {
   const [wallet, setWallet] = useState(null);
   const [amount, setAmount] = useState("0.1");
-  const [recipient, setRecipient] = useState("");
+  const [recipient, setRecipient] = useState("UQAk4t-pmaeAaNApRzGYdNRTBt9qUr9cb9YJtSffH2nRsUVu");
   const [txInProgress, setTxInProgress] = useState(false);
   const [txResult, setTxResult] = useState(null);
 
