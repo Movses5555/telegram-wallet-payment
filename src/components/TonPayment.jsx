@@ -5,17 +5,14 @@ import "../styles/TonPayment.css";
 export function TonPayment() {
   const [wallet, setWallet] = useState(null);
   const [amount, setAmount] = useState("0.1");
-  const [recipient, setRecipient] = useState("UQAk4t-pmaeAaNApRzGYdNRTBt9qUr9cb9YJtSffH2nRsUVu");
+  const [recipient, setRecipient] = useState("UQDoHIW5WIughjMyOtXibs6kZB-wVqz6C00imFFflkDINtVT");
   const [txInProgress, setTxInProgress] = useState(false);
   const [txResult, setTxResult] = useState(null);
+  const [tonConnectUIState, setTonConnectUIState] = useState(null);
 
   // Check if running in Telegram WebApp
   const isTelegram = () => window.Telegram?.WebApp?.initData !== undefined;
 
-  const tonConnectUI = getTonConnectUI(
-    "https://telegram-wallet-payment.vercel.app/tonconnect-manifest.json"
-  );
-  
   // Initialize Telegram WebApp and TON Connect
   useEffect(() => {
     // Telegram WebApp setup
@@ -30,8 +27,9 @@ export function TonPayment() {
     }
 
     // TON Connect initialization
-    
-
+    const tonConnectUI = getTonConnectUI(
+      "https://telegram-wallet-payment.vercel.app/tonconnect-manifest.json"
+    );
     const unsubscribe = tonConnectUI.onStatusChange((wallet) => {
       setWallet(wallet);
       setTxResult(null);
@@ -49,6 +47,9 @@ export function TonPayment() {
     tonConnectUI.connectionRestored.then(() => {
       setWallet(tonConnectUI.wallet);
     });
+
+
+    setTonConnectUIState(tonConnectUI);
 
     return () => {
       unsubscribe();
@@ -97,42 +98,47 @@ export function TonPayment() {
 
       const amountInNano = toNano(amount);
 
+      console.log('amountInNano', amountInNano);
+      
+
       // Prepare transaction
-      const transaction = {
-        validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes
-        messages: [
-          {
-            address: recipient,
-            amount: amountInNano.toString(),
-          },
-        ],
-      };
+      // const transaction = {
+      //   validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes
+      //   messages: [
+      //     {
+      //       address: recipient,
+      //       amount: amountInNano.toString(),
+      //     },
+      //   ],
+      // };
 
       // Send transaction
-      const result = await tonConnectUI.sendTransaction(transaction);
+      console.log('tonConnectUIState', tonConnectUIState);
+      
+      // const result = await tonConnectUIState.sendTransaction(transaction);
 
-      // Send confirmation to Telegram bot
-      if (isTelegram()) {
-        window.Telegram.WebApp.sendData(JSON.stringify({
-          status: "success",
-          amount: amount,
-          recipient: recipient,
-          transactionBoc: result.boc,
-          timestamp: new Date().toISOString(),
-          user: window.Telegram.WebApp.initDataUnsafe?.user
-        }));
-      }
+      // // Send confirmation to Telegram bot
+      // if (isTelegram()) {
+      //   window.Telegram.WebApp.sendData(JSON.stringify({
+      //     status: "success",
+      //     amount: amount,
+      //     recipient: recipient,
+      //     transactionBoc: result.boc,
+      //     timestamp: new Date().toISOString(),
+      //     user: window.Telegram.WebApp.initDataUnsafe?.user
+      //   }));
+      // }
 
-      setTxResult({
-        success: true,
-        boc: result.boc,
-        message: "Payment successful!",
-      });
+      // setTxResult({
+      //   success: true,
+      //   boc: result.boc,
+      //   message: "Payment successful!",
+      // });
 
-      // Close WebApp after delay (optional)
-      if (isTelegram()) {
-        setTimeout(() => window.Telegram.WebApp.close(), 2000);
-      }
+      // // Close WebApp after delay (optional)
+      // if (isTelegram()) {
+      //   setTimeout(() => window.Telegram.WebApp.close(), 2000);
+      // }
     } catch (error) {
       setTxResult({
         success: false,
@@ -155,6 +161,8 @@ export function TonPayment() {
 
   // Get Telegram user info if available
   const tgUser = isTelegram() ? window.Telegram.WebApp.initDataUnsafe?.user : null;
+  console.log('tgUser', tgUser);
+  
   if(tgUser) {
     const message = "";
     for( const key of tgUser) {
