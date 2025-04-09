@@ -12,6 +12,10 @@ export function TonPayment() {
   // Check if running in Telegram WebApp
   const isTelegram = () => window.Telegram?.WebApp?.initData !== undefined;
 
+  const tonConnectUI = getTonConnectUI(
+    "https://telegram-wallet-payment.vercel.app/tonconnect-manifest.json"
+  );
+  
   // Initialize Telegram WebApp and TON Connect
   useEffect(() => {
     // Telegram WebApp setup
@@ -26,9 +30,7 @@ export function TonPayment() {
     }
 
     // TON Connect initialization
-    const tonConnectUI = getTonConnectUI(
-      "https://telegram-wallet-payment.vercel.app/tonconnect-manifest.json"
-    );
+    
 
     const unsubscribe = tonConnectUI.onStatusChange((wallet) => {
       setWallet(wallet);
