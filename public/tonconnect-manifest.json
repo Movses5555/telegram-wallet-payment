@@ -1,7 +1,7 @@
 {
-  "url": "http://localhost:3000",
+  "url": "https://telegram-wallet-payment.vercel.app",
   "name": "TON Payment App",
-  "iconUrl": "https://ton.org/ton_symbol.svg",
-  "termsOfUseUrl": "http://localhost:3000/terms",
-  "privacyPolicyUrl": "http://localhost:3000/privacy"
+  "iconUrl": "https://telegram-wallet-payment.vercel.app/ton_symbol.png",
+  "termsOfUseUrl": "https://telegram-wallet-payment.vercel.app/terms",
+  "privacyPolicyUrl": "https://telegram-wallet-payment.vercel.app/privacy"
 }
