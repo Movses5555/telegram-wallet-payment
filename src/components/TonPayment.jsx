@@ -4,7 +4,7 @@ import "../styles/TonPayment.css";
 
 export function TonPayment() {
   const [wallet, setWallet] = useState(null);
-  const [amount, setAmount] = useState("0.1");
+  const [amount, setAmount] = useState("0.01");
   const [recipient, setRecipient] = useState("UQDoHIW5WIughjMyOtXibs6kZB-wVqz6C00imFFflkDINtVT");
   const [txInProgress, setTxInProgress] = useState(false);
   const [txResult, setTxResult] = useState(null);
@@ -102,43 +102,43 @@ export function TonPayment() {
       
 
       // Prepare transaction
-      // const transaction = {
-      //   validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes
-      //   messages: [
-      //     {
-      //       address: recipient,
-      //       amount: amountInNano.toString(),
-      //     },
-      //   ],
-      // };
+      const transaction = {
+        validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes
+        messages: [
+          {
+            address: recipient,
+            amount: amountInNano.toString(),
+          },
+        ],
+      };
 
       // Send transaction
       console.log('tonConnectUIState', tonConnectUIState);
       
-      // const result = await tonConnectUIState.sendTransaction(transaction);
+      const result = await tonConnectUIState.sendTransaction(transaction);
 
-      // // Send confirmation to Telegram bot
-      // if (isTelegram()) {
-      //   window.Telegram.WebApp.sendData(JSON.stringify({
-      //     status: "success",
-      //     amount: amount,
-      //     recipient: recipient,
-      //     transactionBoc: result.boc,
-      //     timestamp: new Date().toISOString(),
-      //     user: window.Telegram.WebApp.initDataUnsafe?.user
-      //   }));
-      // }
+      // Send confirmation to Telegram bot
+      if (isTelegram()) {
+        window.Telegram.WebApp.sendData(JSON.stringify({
+          status: "success",
+          amount: amount,
+          recipient: recipient,
+          transactionBoc: result.boc,
+          timestamp: new Date().toISOString(),
+          user: window.Telegram.WebApp.initDataUnsafe?.user
+        }));
+      }
 
-      // setTxResult({
-      //   success: true,
-      //   boc: result.boc,
-      //   message: "Payment successful!",
-      // });
+      setTxResult({
+        success: true,
+        boc: result.boc,
+        message: "Payment successful!",
+      });
 
-      // // Close WebApp after delay (optional)
-      // if (isTelegram()) {
-      //   setTimeout(() => window.Telegram.WebApp.close(), 2000);
-      // }
+      // Close WebApp after delay (optional)
+      if (isTelegram()) {
+        setTimeout(() => window.Telegram.WebApp.close(), 2000);
+      }
     } catch (error) {
       setTxResult({
         success: false,
