@@ -5,70 +5,48 @@ import "../styles/TonPayment.css";
 export function TonPayment() {
   const [wallet, setWallet] = useState(null);
   const [amount, setAmount] = useState("0.01");
-  const [recipient, setRecipient] = useState("UQDoHIW5WIughjMyOtXibs6kZB-wVqz6C00imFFflkDINtVT");
+  const [recipient, setRecient] = useState("UQDoHIW5WIughjMyOtXibs6kZB-wVqz6C00imFFflkDINtVT");
   const [txInProgress, setTxInProgress] = useState(false);
   const [txResult, setTxResult] = useState(null);
-  const [tonConnectUIState, setTonConnectUIState] = useState(null);
+  const [tonConnectUI, setTonConnectUI] = useState(null);
+  const [webhookPayloadState, setWebhookPayloadState] = useState(null);
+  const [transactionState, setTransactionState] = useState(null);
+  const [resultState, setResultState] = useState(null);
+
+  // Webhook configuration
+  const WEBHOOK_URL = "https://damage-hands-publishing-church.trycloudflare.com/user/payment/webhook";
+  const WEBHOOK_SECRET = "your-secret-key"; // Should be from environment variables in production
 
   // Check if running in Telegram WebApp
   const isTelegram = () => window.Telegram?.WebApp?.initData !== undefined;
 
-  // Initialize Telegram WebApp and TON Connect
+  // Initialize
   useEffect(() => {
-    // Telegram WebApp setup
+    // Telegram setup
     if (isTelegram()) {
       window.Telegram.WebApp.expand();
       window.Telegram.WebApp.enableClosingConfirmation();
       document.body.style.backgroundColor = window.Telegram.WebApp.backgroundColor;
-      
-      // Setup Telegram MainButton
-      window.Telegram.WebApp.MainButton.setText("Send TON Payment");
-      window.Telegram.WebApp.MainButton.onClick(handlePayment);
     }
 
     // TON Connect initialization
-    const tonConnectUI = getTonConnectUI(
+    const tonConnectUIInstance = getTonConnectUI(
       "https://telegram-wallet-payment.vercel.app/tonconnect-manifest.json"
     );
-    const unsubscribe = tonConnectUI.onStatusChange((wallet) => {
+
+    const unsubscribe = tonConnectUIInstance.onStatusChange((wallet) => {
       setWallet(wallet);
       setTxResult(null);
-      
-      // Update Telegram MainButton visibility
-      if (isTelegram()) {
-        if (wallet && recipient && amount) {
-          window.Telegram.WebApp.MainButton.show();
-        } else {
-          window.Telegram.WebApp.MainButton.hide();
-        }
-      }
     });
 
-    tonConnectUI.connectionRestored.then(() => {
-      setWallet(tonConnectUI.wallet);
+    tonConnectUIInstance.connectionRestored.then(() => {
+      setWallet(tonConnectUIInstance.wallet);
     });
 
+    setTonConnectUI(tonConnectUIInstance);
 
-    setTonConnectUIState(tonConnectUI);
-
-    return () => {
-      unsubscribe();
-      if (isTelegram()) {
-        window.Telegram.WebApp.MainButton.offClick(handlePayment);
-      }
-    };
+    return () => unsubscribe();
   }, []);
-
-  // Update Telegram MainButton when form changes
-  useEffect(() => {
-    if (isTelegram() && wallet) {
-      if (recipient && amount) {
-        window.Telegram.WebApp.MainButton.show();
-      } else {
-        window.Telegram.WebApp.MainButton.hide();
-      }
-    }
-  }, [recipient, amount, wallet]);
 
   const validateTonAddress = (address) => {
     if (!address) return false;
@@ -76,12 +54,10 @@ export function TonPayment() {
     return address.length >= 48;
   };
 
-  const toNano = (amount) => {
-    return Math.floor(Number(amount) * 1000000000);
-  };
+  const toNano = (amount) => Math.floor(Number(amount) * 1000000000);
 
   const handlePayment = async () => {
-    if (!wallet || !recipient) return;
+    if (!wallet || !recipient || !tonConnectUI) return;
 
     try {
       setTxInProgress(true);
@@ -97,48 +73,47 @@ export function TonPayment() {
       }
 
       const amountInNano = toNano(amount);
-
-      console.log('amountInNano', amountInNano);
-      
-
-      // Prepare transaction
-      const transaction = {
-        validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes
-        messages: [
-          {
-            address: recipient,
-            amount: amountInNano.toString(),
-          },
-        ],
+      const webhookPayload = {
+        telegramUser: isTelegram() ? window.Telegram.WebApp.initDataUnsafe?.user : null,
+        senderAddress: wallet.account.address,
+        recipientAddress: recipient,
+        amount: amount,
+        timestamp: new Date().toISOString()
       };
+      setWebhookPayloadState(webhookPayload);
+      console.log('webhookPayload', webhookPayload);
+      
+      // Prepare transaction with webhook reference
+      const transaction = {
+        validUntil: Math.floor(Date.now() / 1000) + 300,
+        messages: [{
+          address: recipient,
+          amount: amountInNano.toString(),
+          payload: createWebhookPayload(webhookPayload)
+        }]
+      };
+      setTransactionState(transaction)
+      console.log('transaction', transaction);
 
       // Send transaction
-      console.log('tonConnectUIState', tonConnectUIState);
-      
-      const result = await tonConnectUIState.sendTransaction(transaction);
+      const result = await tonConnectUI.sendTransaction(transaction);
 
-      // Send confirmation to Telegram bot
-      if (isTelegram()) {
-        window.Telegram.WebApp.sendData(JSON.stringify({
-          status: "success",
-          amount: amount,
-          recipient: recipient,
-          transactionBoc: result.boc,
-          timestamp: new Date().toISOString(),
-          user: window.Telegram.WebApp.initDataUnsafe?.user
-        }));
-      }
+      setResultState(result);
+      console.log('result', result);
+
+      // Immediately notify backend via webhook
+      await sendWebhookNotification({
+        ...webhookPayload,
+        transactionBoc: result.boc,
+        status: "pending"
+      });
 
       setTxResult({
         success: true,
         boc: result.boc,
-        message: "Payment successful!",
+        message: "Payment processing...",
       });
 
-      // Close WebApp after delay (optional)
-      if (isTelegram()) {
-        setTimeout(() => window.Telegram.WebApp.close(), 2000);
-      }
     } catch (error) {
       setTxResult({
         success: false,
@@ -149,31 +124,53 @@ export function TonPayment() {
     }
   };
 
-  const disconnect = () => {
-    const tonConnectUI = getTonConnectUI();
-    tonConnectUI.disconnect();
-    setWallet(null);
-    
-    if (isTelegram()) {
-      window.Telegram.WebApp.MainButton.hide();
+  // Create transaction payload with webhook reference
+  const createWebhookPayload = (data) => {
+    // This would need to be implemented using @ton/core or similar
+    // For simplicity, we'll just include a reference
+    return {
+      webhook: WEBHOOK_URL,
+      data: btoa(JSON.stringify(data)) // Simple encoding for demo
+    };
+  };
+
+  // Send direct webhook notification
+  const sendWebhookNotification = async (data) => {
+    try {
+      const response = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Webhook-Signature": generateSignature(data)
+        },
+        body: JSON.stringify(data)
+      });
+      console.log('response', response);
+      
+
+      if (!response.ok) {
+        console.error("Webhook failed:", await response.text());
+      }
+    } catch (error) {
+      console.error("Webhook error:", error);
     }
   };
 
-  // Get Telegram user info if available
+  // Generate HMAC signature for webhook security
+  const generateSignature = (payload) => {
+    // In a real app, use crypto.subtle for browser-based HMAC
+    const encoder = new TextEncoder();
+    const key = encoder.encode(WEBHOOK_SECRET);
+    const data = encoder.encode(JSON.stringify(payload));
+    return crypto.subtle.digest("SHA-256", new Uint8Array([...key, ...data]))
+      .then(hash => btoa(String.fromCharCode(...new Uint8Array(hash))));
+  };
+
+  // Get Telegram user info
   const tgUser = isTelegram() ? window.Telegram.WebApp.initDataUnsafe?.user : null;
-  console.log('tgUser', tgUser);
-  
-  if(tgUser) {
-    const message = "";
-    for( const key of tgUser) {
-      message += `${key}: ${tgUser[key]}`
-    }
-    alert(message);
-  }
 
   return (
     <div className="ton-payment-container">
-      {/* Telegram User Info */}
       {tgUser && (
         <div className="tg-user-info">
           <p>Hello, {tgUser.first_name || "User"}!</p>
@@ -183,16 +180,14 @@ export function TonPayment() {
 
       <h2>TON Payment Gateway</h2>
 
-      {/* TON Connect Button */}
       <div id="ton-connect-button"></div>
 
-      {/* Payment Form */}
       {wallet ? (
         <div className="payment-form">
           <div className="wallet-info">
             <p>Connected: {wallet.name}</p>
             <p>Address: {wallet.account.address}</p>
-            <button onClick={disconnect}>Disconnect</button>
+            <button onClick={() => tonConnectUI.disconnect()}>Disconnect</button>
           </div>
 
           <div className="payment-fields">
@@ -217,42 +212,75 @@ export function TonPayment() {
               />
             </label>
 
-            {/* Regular button (hidden in Telegram) */}
-            {!isTelegram() && (
-              <button
-                onClick={handlePayment}
-                disabled={txInProgress || !recipient || !amount}
-              >
-                {txInProgress ? "Processing..." : "Send Payment"}
-              </button>
-            )}
+            <button
+              onClick={handlePayment}
+              disabled={txInProgress || !recipient || !amount}
+            >
+              {txInProgress ? "Processing..." : "Send Payment"}
+            </button>
           </div>
 
-          {/* Transaction Result */}
           {txResult && (
             <div className={`tx-result ${txResult.success ? "success" : "error"}`}>
               {txResult.message}
               {txResult.boc && (
                 <div className="tx-details">
-                  <p>Transaction BOC:</p>
-                  <code>{txResult.boc}</code>
+                  <p>Transaction ID:</p>
+                  <code>{txResult.boc.slice(0, 20)}...</code>
                 </div>
               )}
             </div>
           )}
+          <h2>webhookPayloadState</h2>
+          {
+            webhookPayloadState && Object.keys(webhookPayloadState)?.map((key) => {
+              let item = webhookPayloadState[key];
+              if(typeof item === 'object' && item !== null) {
+                item = JSON.stringify(item)
+              }
+              return (
+                <>
+                  {item}
+                  <br/>
+                </>
+              )
+            })
+          }
+          <h2>transactionState</h2>
+          {
+            transactionState && Object.keys(transactionState)?.map((key) => {
+              let item = transactionState[key];
+              if(typeof item === 'object' && item !== null) {
+                item = JSON.stringify(item)
+              }
+              return (
+                <>
+                  {item}
+                  <br/>
+                </>
+              )
+            })
+          }
+          <h2>resultState</h2>
+          {
+            resultState && Object.keys(resultState)?.map((key) => {
+              let item = resultState[key];
+              if(typeof item === 'object' && item !== null) {
+                item = JSON.stringify(item)
+              }
+              return (
+                <>
+                  {item}
+                  <br/>
+                </>
+              )
+            })
+          }
         </div>
       ) : (
         <p className="connect-prompt">
           Connect your TON wallet to make payments
         </p>
-      )}
-
-      {/* Debug Info (remove in production) */}
-      {isTelegram() && (
-        <div className="debug-info">
-          <p>Theme: {window.Telegram.WebApp.colorScheme}</p>
-          <p>Platform: {window.Telegram.WebApp.platform}</p>
-        </div>
       )}
     </div>
   );
